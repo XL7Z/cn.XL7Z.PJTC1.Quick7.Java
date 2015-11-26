@@ -13,17 +13,33 @@ import XL7Z.PJTC1.Quick7.Java.UI.AWT.Event.MouseAdapter;
 
 /**
  * 高级窗体插件，提供了自定义窗体的伪最大最小化功能，适用于无边框无标题栏的DIY窗体
- * 使用方法：在构造函数中直接把欲实现功能的窗体传进去即可，建议把自制的“标题栏”也传进去，这样可以提供拖动支持
+ * 使用方法：在构造函数中直接把欲实现功能的窗体传进去即可，建议把自制的“标题栏”也传进去，这样可以提供拖拽支持
  * 
  * @author 泽远
- * @version 0.5
+ * @version 0.6
+ * 
+ *          <code>
+ *          v0.1 2015-11-15 [XL7Z]wwjy2245
+ *          创建
+ *          v0.2 2015-11-18 [XL7Z]wwjy2245
+ *          增加了新功能：仿Win7拖拽缩放(撞击屏幕上缘最大化)
+ *          v0.5 2015-11-18 [XL7Z]wwjy2245
+ *          增加了新功能：仿Win7拖拽缩放(左右半屏与离开上缘最小化)、代码微调、加上Doc
+ *          v0.6 2015-11-26 [XL7Z]wwjy2245
+ *          修复Bug：拖拽缩放拖离半屏位置后不还原原始大小
+ * 
+ *          待更新的内容： 
+ *          Bug：拖拽缩放时拖拽标题栏右侧触发最小化后指针在窗体外面
+ *          新功能：拖拽缩放的虚影预览
+ *          新功能：边缘缩放(Resizeable)，让setUndecorated(true)的窗体像正常窗口一样可调节大小
+ *          </code>
  */
 public class AdvancedForm {
 	/**
 	 * 看一下具体内容你就懂了，傻逼都能看懂，不多说
 	 */
 	public enum FormSizeState {
-		Minimize, Normal, Maximize
+		Minimize, Normal, Maximize, HalfScreen
 	};
 
 	private JFrame JFRM;
@@ -114,9 +130,10 @@ public class AdvancedForm {
 	MouseMotionAdapter MMApt_DragMove = new MouseMotionAdapter() {
 		@Override
 		public void mouseDragged(MouseEvent e) {
-			// 允许拖动的情况：窗口正常或者最大化并开着边缘缩放(会触发还原)
+			// 允许拖拽的情况：窗口正常或者最大化并开着边缘缩放(会触发还原)
 			if (Get_FormSizeState() == FormSizeState.Normal
-					|| (Get_FormSizeState() == FormSizeState.Maximize && EdgeResize)) {
+					|| (Get_FormSizeState() == FormSizeState.Maximize && EdgeResize)
+					|| (Get_FormSizeState() == FormSizeState.HalfScreen && EdgeResize)) {
 				Mouse_OnScreen_X = e.getXOnScreen();
 				Mouse_OnScreen_Y = e.getYOnScreen();
 				FRMNormal_Location_X = Mouse_OnScreen_X - Mouse_OnFRM_X;
@@ -125,8 +142,9 @@ public class AdvancedForm {
 					FRMNormal_Location_Y = ScreenInsets.top;
 				}
 				// 开着拖拽缩放的时候去拽一个最大化的窗口，则触发还原
-				if (FRMNormal_Location_Y > ScreenInsets.top && Get_FormSizeState() == FormSizeState.Maximize
-						&& EdgeResize) {
+				if (FRMNormal_Location_Y > ScreenInsets.top
+						&& ((Get_FormSizeState() == FormSizeState.Maximize && EdgeResize)
+								|| (Get_FormSizeState() == FormSizeState.HalfScreen && EdgeResize))) {
 					double MouseDragAtPer = (double) Mouse_OnFRM_X / JFRM.getWidth();
 					System.out.println(Mouse_OnFRM_X + ":" + JFRM.getWidth());
 					System.out.println("拖拽于标题栏" + MouseDragAtPer + "处");
@@ -141,7 +159,7 @@ public class AdvancedForm {
 	};
 
 	/**
-	 * 开关仿Win7的拖动到边缘缩放
+	 * 开关仿Win7的拖拽到边缘缩放
 	 * 
 	 * @param Enable
 	 *            【￣^￣】自己猜！
@@ -151,7 +169,7 @@ public class AdvancedForm {
 	}
 
 	/**
-	 * 确认仿Win7的拖动到边缘缩放
+	 * 确认仿Win7的拖拽到边缘缩放
 	 * 
 	 * @return 【￣^￣】自己猜！
 	 */
@@ -210,6 +228,17 @@ public class AdvancedForm {
 			JFRM.setResizable(true);
 			JFRM.setSize(FRMNormal_Size_X, FRMNormal_Size_Y);
 			FRMSize = FormSizeState.Normal;
+			break;
+
+		case HalfScreen:
+			FRMNormal_Size_X = JFRM.getWidth();
+			FRMNormal_Size_Y = JFRM.getHeight();
+			FRMNormal_Location_X = JFRM.getX();
+			FRMNormal_Location_Y = JFRM.getY();
+			JFRM.setSize((ScreenSize.width - ScreenInsets.left - ScreenInsets.right) / 2,
+					ScreenSize.height - ScreenInsets.top - ScreenInsets.bottom);
+			FRMSize = FormSizeState.HalfScreen;
+			break;
 		}
 
 	}
@@ -226,21 +255,17 @@ public class AdvancedForm {
 	 * 左半屏
 	 */
 	public void FRM_HalfScreen_Lift() {
-		Set_FormSizeState(FormSizeState.Normal);
+		Set_FormSizeState(FormSizeState.HalfScreen);
 		JFRM.setLocation(ScreenInsets.left, ScreenInsets.top);
-		JFRM.setSize((ScreenSize.width - ScreenInsets.left - ScreenInsets.right) / 2,
-				ScreenSize.height - ScreenInsets.top - ScreenInsets.bottom);
 	}
 
 	/**
 	 * 右半屏
 	 */
 	public void FRM_HalfScreen_Right() {
-		Set_FormSizeState(FormSizeState.Normal);
+		Set_FormSizeState(FormSizeState.HalfScreen);
 		JFRM.setLocation((ScreenSize.width - ScreenInsets.left - ScreenInsets.right) / 2 + ScreenInsets.left,
 				ScreenInsets.top);
-		JFRM.setSize((ScreenSize.width - ScreenInsets.left - ScreenInsets.right) / 2,
-				ScreenSize.height - ScreenInsets.top - ScreenInsets.bottom);
 	}
 
 }
